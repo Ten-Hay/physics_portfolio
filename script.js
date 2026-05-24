@@ -11,7 +11,7 @@ class Ball {
         this.target_x = x;
         this.target_y = y;
         this.r = r;
-        this.velo_x = 10;
+        this.velo_x = 10; 
         this.moving = false;
         this.curve = null;
         
@@ -19,7 +19,6 @@ class Ball {
         
         BALLZ.push(this);
     }
-
 
     get anchorX() { return this.x; }
     get anchorY() { return this.y; }
@@ -48,13 +47,11 @@ class Curve {
 }
 
 class AttachedRect {
-    // TWEAK: anchorBall is now a generic 'parent'
     constructor(parent, length, height) {
         this.parent = parent;
         this.length = length;
         this.height = height;
         
-        // NEW: Tell the engine this object CAN be pulled
         this.isDynamic = true;
         
         this.tailX = parent.anchorX;
@@ -65,7 +62,6 @@ class AttachedRect {
         ATTACHMENTS.push(this);
     }
 
-    // NEW: Expose our tail as the anchor for the NEXT joint in the chain
     get anchorX() { return this.tailX; }
     get anchorY() { return this.tailY; }
 
@@ -94,16 +90,14 @@ class AttachedRect {
             const percent = difference / distance;
             
             if (this.parent.isDynamic) {
-                // If attached to another rectangle, both move 50% towards/away from each other
                 const offsetX = dx * percent * 0.5;
                 const offsetY = dy * percent * 0.5;
                 
                 this.tailX += offsetX;
                 this.tailY += offsetY;
-                this.parent.tailX -= offsetX; // Pulls the parent's tail
+                this.parent.tailX -= offsetX; 
                 this.parent.tailY -= offsetY;
             } else {
-                // If attached to the ball, the ball doesn't move, so we move 100%
                 this.tailX += dx * percent;
                 this.tailY += dy * percent;
             }
@@ -120,10 +114,8 @@ class AttachedRect {
         ctx.rotate(angle);
         
         ctx.fillStyle = "blue";
-        // Draw centered on the joint
         ctx.fillRect(0, -this.height / 2, this.length, this.height);
         
-        // Optional: Draw a small pin to show the joint connection
         ctx.fillStyle = "white";
         ctx.beginPath();
         ctx.arc(0, 0, 3, 0, 2*Math.PI);
@@ -138,8 +130,20 @@ canvas.addEventListener('click', function(e) {
     Ball1.target_x = e.clientX - rect.left;
     Ball1.target_y = e.clientY - rect.top;
 
-    let speed = Math.abs(Ball1.velo_x);
-    Ball1.velo_x = (Ball1.target_x > Ball1.x) ? speed : -speed;
+    // --- NEW LOGIC: Prevent divide-by-zero if user clicks exactly vertically ---
+    if (Ball1.target_x === Ball1.x) {
+        Ball1.target_x += 1; 
+    }
+
+    // --- NEW LOGIC: Calibrate velo_x based on total straight-line distance ---
+    const dx = Ball1.target_x - Ball1.x;
+    const dy = Ball1.target_y - Ball1.y;
+    const totalDistance = Math.hypot(dx, dy);
+    
+    const desiredOverallSpeed = 10; // Change this number to make the ball faster or slower overall!
+    const framesToArrival = totalDistance / desiredOverallSpeed;
+
+    Ball1.velo_x = dx / framesToArrival;
 
     Ball1.curve = calculateCurve(Ball1.x, Ball1.y, Ball1.target_x, Ball1.target_y);
     Ball1.moving = true;
@@ -162,10 +166,10 @@ function mainLoop(timestamp) {
     // 1. Move Kinematic Bodies (The Ball)
     BALLZ.forEach((b) => {
         if (b.moving) {
-            const passedMovingRight = b.velo_x > 0 && b.x >= b.target_x;
-            const passedMovingLeft = b.velo_x < 0 && b.x <= b.target_x;
+            // --- NEW LOGIC: Stop condition based on remaining distance ---
+            const distanceToTargetX = Math.abs(b.target_x - b.x);
             
-            if (passedMovingRight || passedMovingLeft) {
+            if (distanceToTargetX <= Math.abs(b.velo_x)) {
                 b.x = b.target_x;
                 b.y = b.target_y;
                 b.moving = false;
